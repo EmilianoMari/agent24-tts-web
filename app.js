@@ -56,15 +56,24 @@ class VoiceForge {
         this.audioPlayer.addEventListener('play', () => this.onPlay());
         this.audioPlayer.addEventListener('pause', () => this.onPause());
 
-        // Keyboard shortcuts
+        // Keyboard shortcuts - only on body, not when typing
         document.addEventListener('keydown', (e) => {
+            // Skip if user is typing in an input field
+            const active = document.activeElement;
+            const isTyping = active && (
+                active.tagName === 'TEXTAREA' ||
+                active.tagName === 'INPUT' ||
+                active.tagName === 'SELECT' ||
+                active.isContentEditable
+            );
+
+            if (isTyping) return;
+
             if (e.key === 'Enter' && e.ctrlKey) {
                 e.preventDefault();
                 this.generateSpeech();
             }
-            // Only toggle play on spacebar if not in a text input
-            const tag = document.activeElement.tagName.toLowerCase();
-            if (e.key === ' ' && tag !== 'textarea' && tag !== 'input') {
+            if (e.key === ' ') {
                 e.preventDefault();
                 this.togglePlay();
             }
