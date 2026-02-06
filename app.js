@@ -4,7 +4,7 @@
 
 class VoiceForge {
     constructor() {
-        this.apiUrl = window.TTS_API_URL || 'https://qwen-tts.fr3e.it';
+        this.apiUrl = window.TTS_API_URL || 'https://voice.agent24.it';
         this.audioContext = null;
         this.analyser = null;
         this.audioBuffer = null;
@@ -17,6 +17,8 @@ class VoiceForge {
 
     initElements() {
         this.textInput = document.getElementById('text-input');
+        this.voiceDescription = document.getElementById('voice-description');
+        this.languageSelect = document.getElementById('language-select');
         this.charCount = document.getElementById('char-count');
         this.generateBtn = document.getElementById('generate-btn');
         this.playerSection = document.getElementById('player-section');
@@ -89,6 +91,8 @@ class VoiceForge {
 
     async generateSpeech() {
         const text = this.textInput.value.trim();
+        const voiceDescription = this.voiceDescription.value.trim() || 'A natural, clear voice';
+        const language = this.languageSelect.value;
 
         if (!text) {
             this.showError('Please enter some text to convert to speech.');
@@ -104,12 +108,16 @@ class VoiceForge {
         this.setLoading(true);
 
         try {
-            const response = await fetch(`${this.apiUrl}/tts`, {
+            const response = await fetch(`${this.apiUrl}/synthesize/design`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ text }),
+                body: JSON.stringify({
+                    text,
+                    voice_description: voiceDescription,
+                    language
+                }),
             });
 
             if (!response.ok) {
