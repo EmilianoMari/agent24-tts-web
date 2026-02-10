@@ -20,10 +20,13 @@ RUN mkdir -p /var/cache/nginx/client_temp \
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy static files
-COPY index.html /usr/share/nginx/html/
+# Copy static files and inject cache-busting
 COPY style.css /usr/share/nginx/html/
 COPY app.js /usr/share/nginx/html/
+COPY index.html /usr/share/nginx/html/
+ARG CACHEBUST=1
+RUN sed -i "s/style\.css/style.css?v=${CACHEBUST}/" /usr/share/nginx/html/index.html && \
+    sed -i "s/app\.js/app.js?v=${CACHEBUST}/" /usr/share/nginx/html/index.html
 
 # Set proper ownership for html
 RUN chown -R nginx:nginx /usr/share/nginx/html

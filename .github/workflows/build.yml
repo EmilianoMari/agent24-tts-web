@@ -52,6 +52,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          build-args: |
+            CACHEBUST=${{ github.sha }}
           tags: |
             ghcr.io/${{ steps.meta.outputs.owner-name }}/${{ steps.meta.outputs.repo-name }}:latest
             ghcr.io/${{ steps.meta.outputs.owner-name }}/${{ steps.meta.outputs.repo-name }}:${{ steps.meta.outputs.image_tag }}
