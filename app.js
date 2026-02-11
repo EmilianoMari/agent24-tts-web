@@ -1,11 +1,10 @@
 /**
- * Agent24 TTS - Sintesi Vocale AI
+ * Agent24 TTS - Sintesi Vocale AI (Chatterbox Multilingual)
  */
 
 class Agent24TTS {
     constructor() {
         this.apiUrl = window.TTS_API_URL || 'https://voice.agent24.it';
-        this.currentModelId = 'cosyvoice';
         this.audioContext = null;
         this.analyser = null;
         this.sourceNode = null;
@@ -18,13 +17,17 @@ class Agent24TTS {
         this.initElements();
         this.initEvents();
         this.initAudioContext();
-        this.loadModels();
+        this.loadLanguages();
+        this.loadVoices();
     }
 
     initElements() {
         this.textInput = document.getElementById('text-input');
         this.voiceSelect = document.getElementById('voice-select');
+        this.voiceField = document.getElementById('voice-field');
         this.languageSelect = document.getElementById('language-select');
+        this.emotionRange = document.getElementById('emotion-range');
+        this.emotionValue = document.getElementById('emotion-value');
         this.charCount = document.getElementById('char-count');
         this.charCounter = document.querySelector('.char-counter');
         this.generateBtn = document.getElementById('generate-btn');
@@ -41,9 +44,7 @@ class Agent24TTS {
         this.errorMessage = document.getElementById('error-message');
         this.generationTimer = document.getElementById('generation-timer');
         this.timerValue = document.getElementById('timer-value');
-        this.timerModel = document.getElementById('timer-model');
         this.timerContent = this.generationTimer.querySelector('.timer-content');
-        this.modelTabs = document.querySelectorAll('.model-tab');
         this.canvasCtx = this.waveformCanvas.getContext('2d');
     }
 
@@ -52,20 +53,15 @@ class Agent24TTS {
         this.generateBtn.addEventListener('click', () => this.generateSpeech());
         this.playBtn.addEventListener('click', () => this.togglePlay());
         this.downloadBtn.addEventListener('click', () => this.downloadAudio());
+        this.emotionRange.addEventListener('input', () => {
+            this.emotionValue.textContent = this.emotionRange.value;
+        });
 
         this.audioPlayer.addEventListener('timeupdate', () => this.updateProgress());
         this.audioPlayer.addEventListener('loadedmetadata', () => this.updateDuration());
         this.audioPlayer.addEventListener('ended', () => this.onAudioEnded());
         this.audioPlayer.addEventListener('play', () => this.onPlay());
         this.audioPlayer.addEventListener('pause', () => this.onPause());
-
-        // Model tab switching
-        this.modelTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const modelId = tab.dataset.model;
-                this.switchModel(modelId);
-            });
-        });
 
         document.querySelectorAll('textarea').forEach(textarea => {
             textarea.addEventListener('keydown', (e) => {
@@ -105,93 +101,74 @@ class Agent24TTS {
         }
     }
 
-    async loadModels() {
+    async loadLanguages() {
         try {
-            const response = await fetch(`${this.apiUrl}/models`);
+            const response = await fetch(`${this.apiUrl}/languages`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            this.models = await response.json();
 
-            // Update tab labels from server data
-            this.models.forEach(m => {
-                const tab = document.querySelector(`.model-tab[data-model="${m.id}"]`);
-                if (tab) {
-                    const badge = tab.querySelector('.model-badge');
-                    if (badge) badge.textContent = m.label.split(' ').pop();
-                }
+            const languages = await response.json();
+            this.languageSelect.innerHTML = '';
+
+            languages.forEach(lang => {
+                const option = document.createElement('option');
+                option.value = lang.code;
+                option.textContent = lang.name;
+                if (lang.code === 'it') option.selected = true;
+                this.languageSelect.appendChild(option);
             });
         } catch (e) {
-            console.warn('Failed to load models:', e);
+            console.warn('Failed to load languages:', e);
+            // Fallback
+            this.languageSelect.innerHTML = '<option value="it">Italian</option><option value="en">English</option>';
         }
-
-        this.loadVoices();
-    }
-
-    switchModel(modelId) {
-        this.currentModelId = modelId;
-        this.modelTabs.forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.model === modelId);
-        });
-        this.loadVoices();
     }
 
     async loadVoices() {
-        this.voiceSelect.innerHTML = '<option value="">Caricamento...</option>';
-        this.voiceSelect.disabled = true;
-
         try {
-            const response = await fetch(`${this.apiUrl}/voices?model=${this.currentModelId}`);
+            const response = await fetch(`${this.apiUrl}/voices`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const voices = await response.json();
-            this.voiceSelect.innerHTML = '';
+            this.voiceSelect.innerHTML = '<option value="">Voce predefinita</option>';
 
-            voices.forEach(voice => {
-                const option = document.createElement('option');
-                option.value = voice.value;
-                option.textContent = `${voice.name} — ${voice.description}`;
-                this.voiceSelect.appendChild(option);
-            });
-
-            this.voiceSelect.disabled = false;
+            if (voices.length === 0) {
+                this.voiceField.style.display = 'none';
+            } else {
+                this.voiceField.style.display = '';
+                voices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice.file;
+                    option.textContent = voice.name;
+                    this.voiceSelect.appendChild(option);
+                });
+            }
         } catch (e) {
             console.warn('Failed to load voices:', e);
-            this.voiceSelect.innerHTML = '<option value="">Voci non disponibili</option>';
+            this.voiceField.style.display = 'none';
         }
-    }
-
-    getModelLabel() {
-        if (this.models) {
-            const m = this.models.find(m => m.id === this.currentModelId);
-            if (m) return m.label;
-        }
-        return this.currentModelId;
     }
 
     updateCharCount() {
         const count = this.textInput.value.length;
         this.charCount.textContent = count;
         if (this.charCounter) {
-            this.charCounter.classList.toggle('warning', count > 500);
+            this.charCounter.classList.toggle('warning', count > 900);
         }
     }
 
     async generateSpeech() {
         const text = this.textInput.value.trim();
-        const voice = this.voiceSelect.value;
         const language = this.languageSelect.value;
+        const voice = this.voiceSelect.value || null;
+        const exaggeration = parseFloat(this.emotionRange.value);
 
         if (!text) {
             this.showError('Inserisci del testo da convertire in voce.');
             return;
         }
 
-        if (text.length > 500) {
-            this.showError('Il testo non può superare i 500 caratteri.');
-            return;
-        }
-
-        if (!voice) {
-            this.showError('Seleziona una voce.');
+        if (!language) {
+            this.showError('Seleziona una lingua.');
             return;
         }
 
@@ -200,15 +177,13 @@ class Agent24TTS {
         this.startTimer();
 
         try {
+            const body = { text, language, exaggeration };
+            if (voice) body.voice = voice;
+
             const response = await fetch(`${this.apiUrl}/synthesize`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text,
-                    voice,
-                    language,
-                    model: this.currentModelId,
-                }),
+                body: JSON.stringify(body),
             });
 
             if (!response.ok) {
@@ -413,7 +388,6 @@ class Agent24TTS {
         this.generationTimer.classList.remove('hidden');
         this.timerContent.classList.remove('completed');
         this.timerValue.textContent = '0.0s';
-        this.timerModel.textContent = this.getModelLabel();
 
         this.timerInterval = setInterval(() => {
             const elapsed = (performance.now() - this.timerStartTime) / 1000;
