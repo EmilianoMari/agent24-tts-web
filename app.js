@@ -1,11 +1,19 @@
 /**
- * Agent24 TTS - Sintesi Vocale AI (Chatterbox Multilingual)
+ * TTS Web - Sintesi Vocale AI (Multi-backend)
  * Streaming playback: audio chunks play as they're generated.
+ * Supports: Chatterbox, Kokoro, CosyVoice2
  */
 
-class Agent24TTS {
+const MODELS = {
+    chatterbox: { name: 'Chatterbox', param: 'exaggeration', paramLabel: 'Emozione', paramMin: 0, paramMax: 2, paramStep: 0.1, paramDefault: 0.5 },
+    kokoro:     { name: 'Kokoro',     param: 'speed',        paramLabel: 'Velocit\u00e0', paramMin: 0.5, paramMax: 2, paramStep: 0.1, paramDefault: 1.0 },
+    cosyvoice:  { name: 'CosyVoice',  param: 'speed',        paramLabel: 'Velocit\u00e0', paramMin: 0.5, paramMax: 2, paramStep: 0.1, paramDefault: 1.0 },
+};
+
+class TTSApp {
     constructor() {
-        this.apiUrl = window.TTS_API_URL || 'https://voice.agent24.it';
+        this.currentModel = 'chatterbox';
+        this.apiUrl = window.TTS_API_URL || 'https://chatterbox.agent24.it';
         this.audioContext = null;
         this.analyser = null;
         this.sourceNode = null;
@@ -36,8 +44,9 @@ class Agent24TTS {
         this.voiceSelect = document.getElementById('voice-select');
         this.voiceField = document.getElementById('voice-field');
         this.languageSelect = document.getElementById('language-select');
-        this.emotionRange = document.getElementById('emotion-range');
-        this.emotionValue = document.getElementById('emotion-value');
+        this.paramRange = document.getElementById('emotion-range');
+        this.paramValue = document.getElementById('emotion-value');
+        this.paramLabel = document.querySelector('[for="emotion-range"]');
         this.charCount = document.getElementById('char-count');
         this.charCounter = document.querySelector('.char-counter');
         this.generateBtn = document.getElementById('generate-btn');
@@ -54,8 +63,10 @@ class Agent24TTS {
         this.errorMessage = document.getElementById('error-message');
         this.generationTimer = document.getElementById('generation-timer');
         this.timerValue = document.getElementById('timer-value');
+        this.timerModel = document.getElementById('timer-model');
         this.timerContent = this.generationTimer.querySelector('.timer-content');
         this.canvasCtx = this.waveformCanvas.getContext('2d');
+        this.modelTabs = document.querySelectorAll('.model-tab');
     }
 
     initEvents() {
@@ -63,9 +74,17 @@ class Agent24TTS {
         this.generateBtn.addEventListener('click', () => this.generateSpeech());
         this.playBtn.addEventListener('click', () => this.togglePlay());
         this.downloadBtn.addEventListener('click', () => this.downloadAudio());
-        this.emotionRange.addEventListener('input', () => {
-            this.emotionValue.textContent = this.emotionRange.value;
+        this.paramRange.addEventListener('input', () => {
+            this.paramValue.textContent = this.paramRange.value;
         });
+
+        // Model selector
+        this.modelTabs.forEach(tab => {
+            tab.addEventListener('click', () => this.switchModel(tab));
+        });
+
+        // Reload voices when language changes (Kokoro has per-language voices)
+        this.languageSelect.addEventListener('change', () => this.loadVoices());
 
         this.audioPlayer.addEventListener('timeupdate', () => this.updateProgress());
         this.audioPlayer.addEventListener('loadedmetadata', () => this.updateDuration());
@@ -90,6 +109,39 @@ class Agent24TTS {
         window.addEventListener('resize', () => this.resizeCanvas());
         this.resizeCanvas();
     }
+
+    // ── Model switching ──────────────────────────────────────────────────
+
+    switchModel(tab) {
+        const modelId = tab.dataset.model;
+        const modelUrl = tab.dataset.url;
+        if (modelId === this.currentModel) return;
+
+        this.currentModel = modelId;
+        this.apiUrl = modelUrl;
+
+        // Update tabs
+        this.modelTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        // Update parameter control (emotion for Chatterbox, speed for others)
+        const cfg = MODELS[modelId];
+        this.paramLabel.textContent = cfg.paramLabel;
+        this.paramRange.min = cfg.paramMin;
+        this.paramRange.max = cfg.paramMax;
+        this.paramRange.step = cfg.paramStep;
+        this.paramRange.value = cfg.paramDefault;
+        this.paramValue.textContent = cfg.paramDefault;
+
+        // Reload languages and voices from new backend
+        this.loadLanguages();
+        this.loadVoices();
+
+        // Hide error
+        this.hideError();
+    }
+
+    // ── Audio context ────────────────────────────────────────────────────
 
     initAudioContext() {
         try {
@@ -119,6 +171,8 @@ class Agent24TTS {
         }
     }
 
+    // ── Data loading ─────────────────────────────────────────────────────
+
     async loadLanguages() {
         try {
             const response = await fetch(`${this.apiUrl}/languages`);
@@ -142,7 +196,10 @@ class Agent24TTS {
 
     async loadVoices() {
         try {
-            const response = await fetch(`${this.apiUrl}/voices`);
+            const url = this.currentModel === 'kokoro'
+                ? `${this.apiUrl}/voices?language=${this.languageSelect.value || 'it'}`
+                : `${this.apiUrl}/voices`;
+            const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const voices = await response.json();
@@ -179,7 +236,8 @@ class Agent24TTS {
         const text = this.textInput.value.trim();
         const language = this.languageSelect.value;
         const voice = this.voiceSelect.value || null;
-        const exaggeration = parseFloat(this.emotionRange.value);
+        const paramVal = parseFloat(this.paramRange.value);
+        const cfg = MODELS[this.currentModel];
 
         if (!text) {
             this.showError('Inserisci del testo da convertire in voce.');
@@ -196,8 +254,12 @@ class Agent24TTS {
         this.startTimer();
         this.stopStreamPlayback();
 
+        // Update timer model name
+        this.timerModel.textContent = cfg.name;
+
         try {
-            const body = { text, language, exaggeration };
+            const body = { text, language };
+            body[cfg.param] = paramVal;
             if (voice) body.voice = voice;
 
             const response = await fetch(`${this.apiUrl}/synthesize/stream`, {
@@ -247,13 +309,11 @@ class Agent24TTS {
             const { done, value } = await reader.read();
             if (done) break;
 
-            // Append incoming data to buffer
             const newBuf = new Uint8Array(buffer.length + value.length);
             newBuf.set(buffer);
             newBuf.set(value, buffer.length);
             buffer = newBuf;
 
-            // Parse length-prefixed WAV chunks
             while (buffer.length >= 4) {
                 const view = new DataView(buffer.buffer, buffer.byteOffset, 4);
                 const chunkLen = view.getUint32(0, true);
@@ -268,13 +328,11 @@ class Agent24TTS {
                 const wavBytes = buffer.slice(4, 4 + chunkLen);
                 buffer = buffer.slice(4 + chunkLen);
 
-                // First chunk: stop timer, show player
                 if (this.streamBuffers.length === 0) {
                     this.stopTimer();
                     this.playerSection.classList.remove('hidden');
                 }
 
-                // Decode WAV into AudioBuffer
                 const arrayBuf = wavBytes.buffer.slice(
                     wavBytes.byteOffset,
                     wavBytes.byteOffset + wavBytes.byteLength
@@ -282,7 +340,6 @@ class Agent24TTS {
                 const audioBuffer = await this.audioContext.decodeAudioData(arrayBuf);
                 this.streamBuffers.push(audioBuffer);
 
-                // Schedule immediate playback
                 const source = this.audioContext.createBufferSource();
                 source.buffer = audioBuffer;
                 source.connect(this.analyser);
@@ -293,7 +350,6 @@ class Agent24TTS {
                 this.streamTotalDuration += audioBuffer.duration;
                 this.durationEl.textContent = this.formatTime(this.streamTotalDuration);
 
-                // Start visualization on first chunk
                 if (!this.isPlaying) {
                     this.isPlaying = true;
                     this.playIcon.classList.add('hidden');
@@ -308,10 +364,8 @@ class Agent24TTS {
             throw new Error('Il server ha restituito un audio vuoto. Riprova.');
         }
 
-        // Build combined WAV blob for download + replay
         this.createDownloadableAudio();
 
-        // When last chunk finishes playing, transition to <audio> element mode
         const lastSource = this.streamSources[this.streamSources.length - 1];
         lastSource.onended = () => {
             if (this.streamMode) this.onStreamEnded();
@@ -354,7 +408,6 @@ class Agent24TTS {
         }
         this.drawIdleWaveform();
 
-        // Set combined audio on <audio> element for replay via standard controls
         if (this.currentAudioUrl) {
             this.audioPlayer.src = this.currentAudioUrl;
             this.connectAudioSource();
@@ -368,7 +421,6 @@ class Agent24TTS {
         const sampleRate = this.streamBuffers[0].sampleRate;
         const numChannels = this.streamBuffers[0].numberOfChannels;
 
-        // Collect channel data
         const channels = [];
         for (let ch = 0; ch < numChannels; ch++) {
             const data = new Float32Array(totalLength);
@@ -380,7 +432,6 @@ class Agent24TTS {
             channels.push(data);
         }
 
-        // Encode as 16-bit PCM WAV
         const bytesPerSample = 2;
         const blockAlign = numChannels * bytesPerSample;
         const dataLength = totalLength * blockAlign;
@@ -420,7 +471,6 @@ class Agent24TTS {
 
     togglePlay() {
         if (this.streamMode) {
-            // Streaming mode: pause/resume via AudioContext
             if (this.audioContext.state === 'running') {
                 this.audioContext.suspend();
                 this.isPlaying = false;
@@ -437,7 +487,6 @@ class Agent24TTS {
             return;
         }
 
-        // Standard <audio> element mode (replay after stream ended)
         if (!this.audioPlayer.src) return;
         if (this.audioPlayer.paused) {
             this.audioPlayer.play();
@@ -494,7 +543,7 @@ class Agent24TTS {
         if (!this.currentAudioUrl) return;
         const a = document.createElement('a');
         a.href = this.currentAudioUrl;
-        a.download = 'agent24-tts-audio.wav';
+        a.download = 'tts-audio.wav';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -652,5 +701,5 @@ class Agent24TTS {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    window.agent24TTS = new Agent24TTS();
+    window.ttsApp = new TTSApp();
 });

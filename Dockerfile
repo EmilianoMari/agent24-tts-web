@@ -1,8 +1,8 @@
-# VoiceForge TTS Web - Static Frontend
+# TTS Web - Static Frontend
 FROM nginx:alpine
 
 LABEL maintainer="SeasGroup"
-LABEL description="Modern TTS frontend for Qwen TTS service"
+LABEL description="TTS frontend web interface (multi-backend)"
 
 # Fix permissions for nginx cache directories
 RUN mkdir -p /var/cache/nginx/client_temp \

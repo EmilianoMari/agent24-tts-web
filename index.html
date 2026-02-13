@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent24 TTS - Sintesi Vocale AI</title>
+    <title>TTS - Sintesi Vocale AI</title>
     <meta name="description" content="Trasforma il testo in voce naturale con l'intelligenza artificiale di Agent24.">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23f97316'/%3E%3Ctext x='16' y='24' text-anchor='middle' font-family='Arial,Helvetica,sans-serif' font-weight='700' font-size='24' fill='white'%3EA%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="style.css">
@@ -28,6 +28,19 @@
         </div>
 
         <div class="card">
+            <!-- Model Selector -->
+            <div class="model-selector" id="model-selector">
+                <button class="model-tab active" data-model="chatterbox" data-url="https://chatterbox.agent24.it">
+                    Chatterbox <span class="model-badge">23 lingue</span>
+                </button>
+                <button class="model-tab" data-model="kokoro" data-url="https://kokoro.agent24.it">
+                    Kokoro <span class="model-badge">54 voci</span>
+                </button>
+                <button class="model-tab" data-model="cosyvoice" data-url="https://cosyvoice.agent24.it">
+                    CosyVoice <span class="model-badge">cloning</span>
+                </button>
+            </div>
+
             <!-- Text Input -->
             <div class="field">
                 <div class="field-header">
@@ -78,7 +91,7 @@
                     <span class="timer-dot"></span>
                     <span class="timer-label">Tempo</span>
                     <span id="timer-value" class="timer-value">0.0s</span>
-                    <span id="timer-model" class="timer-model">Chatterbox Multilingual</span>
+                    <span id="timer-model" class="timer-model">Chatterbox</span>
                 </div>
             </div>
 
