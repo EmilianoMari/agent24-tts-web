@@ -260,7 +260,12 @@ class TTSApp {
         try {
             const body = { text, language };
             body[cfg.param] = paramVal;
-            if (voice) body.voice = voice;
+            if (voice) {
+                // CosyVoice uses voice names without extension
+                body.voice = this.currentModel === 'cosyvoice'
+                    ? voice.replace(/\.(wav|flac)$/i, '')
+                    : voice;
+            }
 
             const response = await fetch(`${this.apiUrl}/synthesize/stream`, {
                 method: 'POST',
