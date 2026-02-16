@@ -1,13 +1,15 @@
 /**
  * TTS Web - Sintesi Vocale AI (Multi-backend)
  * Streaming playback: audio chunks play as they're generated.
- * Supports: Chatterbox, Kokoro, CosyVoice2
+ * Supports: Chatterbox, Kokoro, CosyVoice2, ElevenLabs Turbo v2.5, ElevenLabs v3
  */
 
 const MODELS = {
-    chatterbox: { name: 'Chatterbox', param: 'exaggeration', paramLabel: 'Emozione', paramMin: 0, paramMax: 2, paramStep: 0.1, paramDefault: 0.5 },
-    kokoro:     { name: 'Kokoro',     param: 'speed',        paramLabel: 'Velocit\u00e0', paramMin: 0.5, paramMax: 2, paramStep: 0.1, paramDefault: 1.0 },
-    cosyvoice:  { name: 'CosyVoice',  param: 'speed',        paramLabel: 'Velocit\u00e0', paramMin: 0.5, paramMax: 2, paramStep: 0.1, paramDefault: 1.0 },
+    chatterbox:       { name: 'Chatterbox',    param: 'exaggeration', paramLabel: 'Emozione',  paramMin: 0, paramMax: 2, paramStep: 0.1, paramDefault: 0.5, model: null },
+    kokoro:           { name: 'Kokoro',        param: 'speed',        paramLabel: 'Velocit\u00e0', paramMin: 0.5, paramMax: 2, paramStep: 0.1, paramDefault: 1.0, model: null },
+    cosyvoice:        { name: 'CosyVoice',     param: 'speed',        paramLabel: 'Velocit\u00e0', paramMin: 0.5, paramMax: 2, paramStep: 0.1, paramDefault: 1.0, model: null },
+    'elevenlabs-turbo': { name: 'ElevenLabs Turbo', param: 'stability', paramLabel: 'Stabilit\u00e0', paramMin: 0, paramMax: 1, paramStep: 0.05, paramDefault: 0.5, model: 'turbo' },
+    'elevenlabs-v3':    { name: 'ElevenLabs v3',    param: 'stability', paramLabel: 'Stabilit\u00e0', paramMin: 0, paramMax: 1, paramStep: 0.05, paramDefault: 0.5, model: 'multilingual' },
 };
 
 class TTSApp {
@@ -265,6 +267,10 @@ class TTSApp {
                 body.voice = this.currentModel === 'cosyvoice'
                     ? voice.replace(/\.(wav|flac)$/i, '')
                     : voice;
+            }
+            // ElevenLabs requires model parameter
+            if (cfg.model) {
+                body.model = cfg.model;
             }
 
             const response = await fetch(`${this.apiUrl}/synthesize/stream`, {
