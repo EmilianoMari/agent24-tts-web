@@ -205,7 +205,7 @@ class TTSApp {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const voices = await response.json();
-            this.voiceSelect.innerHTML = '<option value="">Voce predefinita</option>';
+            this.voiceSelect.innerHTML = '';
 
             if (voices.length === 0) {
                 this.voiceField.style.display = 'none';
